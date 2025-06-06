@@ -1,1 +1,1 @@
-
+This section covers techniques for exploiting misconfigured or insecure scheduled tasks (cron jobs) to escalate privileges on Linux systems. Includes real-world OSCP-style examples, custom scripts, and common misconfigurations such as writable scripts, world-writable directories, environment variable manipulation, and abuse of wildcards or timing gaps.
