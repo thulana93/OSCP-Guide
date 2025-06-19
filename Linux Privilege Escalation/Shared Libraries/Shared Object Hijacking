@@ -1,0 +1,81 @@
+🔐 Shared Object Hijacking Enumeration (Linux Privilege Escalation)
+📌 Overview
+Shared Object Hijacking is a privilege escalation technique where a SUID binary loads a shared library from a user-writable path, allowing attackers to inject malicious code.
+
+This note outlines how to enumerate and exploit this vulnerability on a compromised Linux host.
+
+🧭 Enumeration Approach (Unprivileged User)
+✅ 1. Find SUID Binaries
+
+      find / -perm -4000 -type f 2>/dev/null
+✅ 2. Check Loaded Libraries (with ldd)
+
+      ldd /path/to/suid_binary
+
+Look for:
+  Missing libraries
+  Non-standard paths (e.g., /tmp, /home/user/dev, etc.)
+
+✅ 3. Check RUNPATH/RPATH (with readelf)
+
+      readelf -d /path/to/suid_binary | grep -E 'RPATH|RUNPATH'
+
+Check if the path is writable:
+
+      [ -w /path/to/suspicious ] && echo "Writable"
+
+✅ 4. Identify the Required Symbol
+
+      strings /path/to/suid_binary | grep -i 'query\|auth\|connect\|load'
+
+✅ 5. Inject Malicious .so
+      If writable path exists and required symbol is known, write a custom .so with that symbol and drop it in the target path.
+
+🔁 Flowchart: Dynamic Linker’s Library Loading Order
+
+                 ┌───────────────┐
+                 │ Run a Program │
+                 └──────┬────────┘
+                        ▼
+            ┌──────────────────────┐
+            │ Is LD_PRELOAD Set?   │◄──────────────┐
+            └─────────┬────────────┘               │
+                      ▼                            │
+   (If not SETUID) Load those libraries first      │
+                      ▼                            │
+            ┌──────────────────────┐               │
+            │ Check LD_LIBRARY_PATH│               │
+            └─────────┬────────────┘               │
+                      ▼                            │
+            ┌──────────────────────┐               │
+            │ Check RUNPATH inside │               │
+            │ the binary           │               │
+            └─────────┬────────────┘               │
+                      ▼                            │
+            ┌──────────────────────┐               │
+            │ Default System Paths │               │
+            │ (/lib, /usr/lib, etc)│               │
+            └─────────┬────────────┘               │
+                      ▼                            │
+            ┌──────────────────────┐               │
+            │   Load First Match   │◄──────────────┘
+            └──────────────────────┘
+
+🧪 Bonus: Bash Script to Automate This
+
+See enum_so_hijack.sh in this repo to:
+        Find SUID binaries
+        Run ldd
+        Check RUNPATH and test write access
+        Identify possibly hijackable .so files
+
+📊 RUNPATH vs LD_PRELOAD Comparison
+Feature	                RUNPATH	                                  LD_PRELOAD
+_______________________________________________________________________________________________________________
+What is it?	            Hardcoded path inside the binary    	    Env variable to load .so before others
+Set by	                Developer (during compilation)	          User (at runtime)
+Override funcs?        	❌ No                                    	✅ Yes
+Used for?    	          Direct library path resolution	          Hooking/debugging/injection
+Ignored by SETUID?	    ❌ No (used even in SETUID)	              ✅ Yes (ignored for SETUID)
+Security Risk	          Dangerous if points to writable path	    Dangerous if used incorrectly (non-SETUID)
+Priority	              After LD_LIBRARY_PATH, before system	    Highest (unless SETUID)
