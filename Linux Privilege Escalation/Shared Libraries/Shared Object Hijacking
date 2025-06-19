@@ -84,9 +84,9 @@ See enum_so_hijack.sh in this repo to:
 Feature	                RUNPATH	                                  LD_PRELOAD
 _______________________________________________________________________________________________________________
 What is it?	            Hardcoded path inside the binary    	    Env variable to load .so before others
-Set by	                Developer (during compilation)	          User (at runtime)
-Override funcs?        	❌ No                                    	✅ Yes
-Used for?    	          Direct library path resolution	          Hooking/debugging/injection
-Ignored by SETUID?	    ❌ No (used even in SETUID)	              ✅ Yes (ignored for SETUID)
-Security Risk	          Dangerous if points to writable path	    Dangerous if used incorrectly (non-SETUID)
-Priority	              After LD_LIBRARY_PATH, before system	    Highest (unless SETUID)
+Set by	            Developer (during compilation)	          User (at runtime)
+Override funcs?        	❌ No                                    	    ✅ Yes
+Used for?    	      Direct library path resolution	          Hooking/debugging/injection
+Ignored by SETUID?      ❌ No (used even in SETUID)	                ✅ Yes (ignored for SETUID)
+Security Risk	      Dangerous if points to writable path	    Dangerous if used incorrectly (non-SETUID)
+Priority	            After LD_LIBRARY_PATH, before system	    Highest (unless SETUID)
