@@ -1,0 +1,47 @@
+PwnKit (CVE-2021-4034) Vulnerability Summary
+PwnKit is a local privilege escalation vulnerability found in pkexec, a setuid-root binary from Polkit, affecting many Linux distributions.
+
+⚠️ Root Cause
+pkexec fails to properly check whether command-line arguments (argv[]) are present.
+When run with no arguments, argv[1] is NULL, but the program still accesses it.
+Because argv[] and envp[] (environment variables) are contiguously stored in memory, argv[1] actually points to envp[0].
+
+🧠 Vulnerability Flow
+Attacker runs:
+      pkexec
+      (with specially crafted environment variables)
+pkexec reads argv[1] → actually reads envp[0]
+It uses this value (e.g., "GCONV_PATH=.") as a command path
+The resolved path is written back to argv[1] → overwrites envp[0]
+Attacker can now inject forbidden variables (e.g., LD_PRELOAD) into the environment
+This leads to arbitrary code execution as root
+
+🧱 Memory Layout Comparison
+Before Exploitation:
+      argv[0] = "pkexec"
+      argv[1] = NULL
+      envp[0] = "GCONV_PATH=."
+      envp[1] = "CHARSET=evil"
+
+After Exploitation:
+      argv[0] = "pkexec"
+      argv[1] = "/full/path/to/evil"   ← Overwrites envp[0]
+      envp[1] = "CHARSET=evil"
+
+🛡️ Exploit Impact
+    Local users can gain root shell
+    Requires no special permissions
+    Works on default installations
+
+✅ Mitigation
+    Apply system updates (pkexec ≥ 0.105 patched this)
+    As a temporary fix:
+        chmod 0755 /usr/bin/pkexec
+
+========================================================================================================
+PoC = https://github.com/arthepsy/CVE-2021-4034
+      
+git clone https://github.com/arthepsy/CVE-2021-4034.git
+      cd CVE-2021-4034
+      gcc cve-2021-4034-poc.c -o poc
+      ./poc
