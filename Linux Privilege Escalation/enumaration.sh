@@ -91,4 +91,12 @@ section "LAST LOGINS AND HISTORY"
 cmd "last -a | head"
 cmd "cat ~/.bash_history"
 
+section "HISTORT FILES"
+cmd "find / -type f \( -name *_hist -o -name *_history \) -exec ls -l {} \; 2>/dev/null"
+
+section "CONFIG FILES"
+cmd "find / -type f \( -name *.conf -o -name *.config \) -exec ls -l {} \; 2>/dev/null"
+
+section "SCRIPTS"
+cmd 'find / -type f -name "*.sh" 2>/dev/null | grep -v "src\|snap\|share"'
 echo -e "\n[*] Script completed. Output saved to $output"
