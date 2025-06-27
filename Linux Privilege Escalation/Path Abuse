@@ -18,6 +18,15 @@ sudo /usr/local/bin/backup.sh
 
 5. Catch the Shell (Run on Your Machine) Start a listener on your machine:
 nc -lvnp <YOUR_PORT>
+
+Requirments
+------------------------------------------------------------------------
+✅ The script must run as root
+✅ The script uses a command (ls) without full path (e.g., ls, not /bin/ls)
+✅ The attacker can create a malicious version of the command (ls)
+✅ The attacker can insert their directory at the beginning of the PATH (e.g., export PATH=/tmp/...:$PATH)
+✅ The attacker controls the shell environment in which the script is run, or the script is executed in a vulnerable context (like a cronjob using attacker-controlled $PATH)
+
 ========================================================================================================================
 Hijacking an Existing Writable Directory in PATH
 
@@ -34,8 +43,72 @@ nc -lvnp <YOUR_PORT>
 
 4. Trigger the Attack (Run as Root) Simulate the root user running git:
 sudo git --version
+
+Requirments
+------------------------------------------------------------------------
+✅ A directory in $PATH is world-writable or attacker-writable
+✅ The command being hijacked (git) is executed by root without full path (e.g., just git)
+✅ The attacker can create and make a fake binary (git) executable
+✅ The command is run as sudo or by a script executed by root
+
 ========================================================================================================================
-Script
+✅ Steps to Check for PATH Hijacking Vulnerability
+
+🔹 1. List All Directories in $PATH
+        echo $PATH
+        Purpose: See where the system looks for executables.
+Look for: Any unusual or writable directories (e.g., /tmp, /home/user/bin, etc.)
+
+🔹 2. Check for Writable Directories in $PATH
+
+        IFS=':' read -ra dirs <<< "$PATH"
+        for dir in "${dirs[@]}"; do
+          [ -d "$dir" ] && [ -w "$dir" ] && echo "[!] Writable: $dir"
+        done
+
+Vulnerable if: Any of these directories are writable by non-root users.
+Exploitable if: Attacker can drop a fake binary there.
+
+🔹 3. Check for Root or Cron Scripts Using Unqualified Commands
+Search for commands like ls, cp, git, etc. without absolute paths:
+
+        grep -RE '^\s*[a-zA-Z0-9_-]+\s' /usr/local/bin /etc/cron* /root 2>/dev/null | grep -v '/'
+
+Vulnerable if: A root-owned script uses ls instead of /bin/ls, etc.
+These commands will resolve using $PATH.
+
+🔹 4. Check Cron Jobs for PATH Issues
+
+    sudo grep -r 'PATH=' /etc/cron*
+
+Vulnerable if:
+$PATH is set insecurely (e.g., includes /tmp)
+Commands in cron scripts rely on unqualified binaries.
+
+🔹 5. Check for Sudo Misconfigurations (Optional)
+
+    sudo -l
+
+Vulnerable if:
+    You can run a command as root that internally uses unqualified commands.
+    You can run scripts/binaries that trust your $PATH.
+
+🔹 6. Simulate a Hijack in a Test Directory (Optional, Safe)
+Create a fake ls to test if a script uses it:
+
+    mkdir /tmp/testpath
+    echo -e '#!/bin/bash\necho "Fake ls executed!"' > /tmp/testpath/ls
+    chmod +x /tmp/testpath/ls
+    export PATH=/tmp/testpath:$PATH
+    ls
+
+If you see "Fake ls executed!", you know the shell used your fake binary.
+If root does something similar, it could be exploited.
+
+
+========================================================================================================================
+Script:
+--------------------------------------------------------------
 #!/bin/bash
 
 echo "[*] Checking for potential PATH hijacking vulnerabilities..."
