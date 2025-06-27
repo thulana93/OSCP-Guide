@@ -1,3 +1,4 @@
+========================================================================================================================
 Adding a Malicious Directory to PATH
 
 1. Set Up the Target Script (Run as Root) Create a sample script that the root user might run periodically:
@@ -17,7 +18,7 @@ sudo /usr/local/bin/backup.sh
 
 5. Catch the Shell (Run on Your Machine) Start a listener on your machine:
 nc -lvnp <YOUR_PORT>
-
+========================================================================================================================
 Hijacking an Existing Writable Directory in PATH
 
 1. Find a Writable Directory in PATH (Run as Attacker)
@@ -33,5 +34,48 @@ nc -lvnp <YOUR_PORT>
 
 4. Trigger the Attack (Run as Root) Simulate the root user running git:
 sudo git --version
+========================================================================================================================
+Script
+#!/bin/bash
 
+echo "[*] Checking for potential PATH hijacking vulnerabilities..."
+
+# 1. Find writable directories in current PATH
+echo -e "\n[+] Writable directories in \$PATH:"
+vuln_dirs=0
+IFS=':' read -ra dirs <<< "$PATH"
+for dir in "${dirs[@]}"; do
+    if [ -w "$dir" ] && [ -d "$dir" ]; then
+        echo "  [!] Writable: $dir"
+        vuln_dirs=$((vuln_dirs+1))
+    fi
+done
+if [ $vuln_dirs -eq 0 ]; then
+    echo "  [-] No writable directories in PATH found."
+fi
+
+# 2. Check for root-owned scripts that use unqualified command names
+echo -e "\n[+] Searching for root scripts with unqualified commands..."
+
+tmpfile=$(mktemp)
+find /usr/local/bin /usr/bin /root /etc/cron* -type f -executable -user root 2>/dev/null | while read -r script; do
+    # Look for commands like "ls", "cp", "git", etc. without slashes
+    grep -E '^\s*[a-zA-Z0-9_-]+\s' "$script" 2>/dev/null | grep -v '/' >> "$tmpfile"
+done
+
+if [ -s "$tmpfile" ]; then
+    echo "  [!] Potential unqualified commands found in root-owned scripts:"
+    sort -u "$tmpfile" | head -n 20
+else
+    echo "  [-] No unqualified commands found in root scripts."
+fi
+rm "$tmpfile"
+
+# 3. Warn about danger
+if [ $vuln_dirs -gt 0 ]; then
+    echo -e "\n[!] System may be vulnerable to PATH hijacking if root runs unqualified commands."
+    echo "[!] Attackers could drop fake binaries into writable PATH directories."
+else
+    echo -e "\n[+] No immediate PATH hijack risk found."
+fi
 
