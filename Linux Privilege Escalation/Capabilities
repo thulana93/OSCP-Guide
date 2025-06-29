@@ -1,0 +1,27 @@
+🧩 How to Enumerate and Exploit Linux Capability Vulnerabilities
+Linux capabilities, if misconfigured, can lead to privilege escalation without sudo or SUID. Here's how to manually enumerate and exploit them.
+
+🔍 Step-by-Step Manual Enumeration
+🔹 1. Find files with capabilities
+        getcap -r / 2>/dev/null
+
+Look for outputs like:
+        /usr/bin/python3.10 = cap_setuid+ep
+        /usr/bin/vim.basic = cap_dac_override+ep
+
+These are binaries that may allow privilege escalation if they use capabilities insecurely.
+
+🔹 2. Understand common dangerous capabilities
+Capability	                      Exploit Potential
+cap_setuid	                      Drop to root via os.setuid(0)
+cap_dac_override	                Read/write restricted files
+cap_sys_ptrace	                  Inject into root processes
+cap_net_raw	                      Raw packet crafting, sniffing, spoofing
+cap_sys_module	                  Load kernel modules (full kernel access)
+cap_sys_chroot	                  Chroot jail creation (sandbox escape)
+
+🔹 3. Exploit based on interpreter or binary behavior
+        Python: use os.setuid(0) or open("/etc/shadow")
+        Vim/nano: edit protected files
+        GDB: attach to root process with call system("id")
+        Bash (with cap_setuid): escalate with setuid(0)
