@@ -3,3 +3,13 @@ Directory search:
     gobluster
     dirbuster
 
+Brute URL Parameters:
+    ffuf
+        Syntax: 
+        ffuf -u "http://abc.com/view.php?username=FUZZ" -w /path/to/usernames.txt -mr "Welcome"
+            -u	Target URL, use FUZZ as the wordlist injection point
+            -w	Path to wordlist file
+            -mr	Match response body text indicating success (e.g., Welcome, Profile for, etc.)
+
+Password brute:
+    Hydra
