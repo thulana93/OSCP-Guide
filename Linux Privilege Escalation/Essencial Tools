@@ -6,10 +6,13 @@ Directory search:
 Brute URL Parameters:
     ffuf
         Syntax: 
-        ffuf -u "http://abc.com/view.php?username=FUZZ" -w /path/to/usernames.txt -mr "Welcome"
+        ffuf -u "http://abc.com/view.php?username=FUZZ" -w /path/to/usernames.txt -mr "Welcome" -s
             -u	Target URL, use FUZZ as the wordlist injection point
             -w	Path to wordlist file
             -mr	Match response body text indicating success (e.g., Welcome, Profile for, etc.)
+            -s To show only actual matches without logs (silent mode)
 
+        If the session is loggedin session (use cookies):
+            ffuf -u "http://abc.com/view.php?username=FUZZ" -w usernames.txt -H "Cookie: PHPSESSID=dsdfsdwdwdxcsdwdsdsdw" -mr "Welcome"
 Password brute:
     Hydra
