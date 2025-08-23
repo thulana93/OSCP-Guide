@@ -1,0 +1,6 @@
+Open the database: sqlite3 mydb.db
+List available tables: .tables
+To check the schema (columns and data types): .schema table_name;
+To select everything from a table: SELECT * FROM table_name;
+                                  SELECT * FROM users;
+Filter results: SELECT username, email FROM users WHERE id = 1;
