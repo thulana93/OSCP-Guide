@@ -18,4 +18,5 @@ Hydra command:
     Example:
         hydra -L /home/thulana/Desktop/Wordlists/usernames.txt -P /home/thulana/Desktop/Wordlists/passlist.txt nocturnal.htb http-post-form "/login.php:username=^USER^&password=^PASS^:Invalid credentials"
 
-
+See listing ports:
+    sudo netstat -tulnp
